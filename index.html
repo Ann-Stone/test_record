@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>語音筆記上傳系統</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft JhengHei', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 24px;
+            padding: 48px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 700px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 12px;
+            text-align: center;
+            font-size: 32px;
+            font-weight: 700;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 16px;
+        }
+        
+        .form-group {
+            margin-bottom: 24px;
+        }
+        
+        label {
+            display: block;
+            color: #555;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        
+        input[type="text"],
+        input[type="file"] {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 15px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+        
+        .file-input-button {
+            background: #f8f9fa;
+            border: 2px dashed #ccc;
+            border-radius: 12px;
+            padding: 32px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .file-input-button:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+        }
+        
+        .file-input-button.has-file {
+            background: #e8f5e9;
+            border-color: #4caf50;
+        }
+        
+        input[type="file"] {
+            position: absolute;
+            left: -9999px;
+        }
+        
+        .file-icon {
+            font-size: 48px;
+        }
+        
+        .file-text {
+            color: #666;
+            font-size: 15px;
+        }
+        
+        .file-name {
+            color: #4caf50;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 16px 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-family: inherit;
+        }
+        
+        #recordBtn {
+            background: #4CAF50;
+            color: white;
+        }
+        
+        #recordBtn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76,175,80,0.4);
+        }
+        
+        #recordBtn.recording {
+            background: #f44336;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        #stopBtn {
+            background: #ff9800;
+            color: white;
+            display: none;
+        }
+        
+        #stopBtn:hover {
+            background: #e68900;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255,152,0,0.4);
+        }
+        
+        #uploadBtn {
+            background: #667eea;
+            color: white;
+            width: 100%;
+        }
+        
+        #uploadBtn:hover:not(:disabled) {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102,126,234,0.4);
+        }
+        
+        #uploadBtn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            text-align: center;
+            margin-bottom: 24px;
+            padding: 16px;
+            border-radius: 12px;
+            background: #f5f5f5;
+            font-size: 15px;
+            font-weight: 500;
+        }
+        
+        .status.recording {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .status.processing {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+        
+        .status.success {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+            display: none;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .recording-indicator {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 16px;
+            background: #ffebee;
+            border-radius: 12px;
+            margin-bottom: 24px;
+        }
+
+        .recording-indicator.active {
+            display: flex;
+        }
+
+        .rec-dot {
+            width: 12px;
+            height: 12px;
+            background: #f44336;
+            border-radius: 50%;
+            animation: blink 1s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .rec-time {
+            font-weight: 600;
+            color: #c62828;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎙️ 語音筆記上傳系統</h1>
+        <p class="subtitle">錄製或上傳語音檔案，自動轉換為文字</p>
+        
+        <div class="form-group">
+            <label for="userId">使用者 ID *</label>
+            <input type="text" id="userId" placeholder="請輸入您的使用者 ID" required>
+        </div>
+        
+        <div class="form-group">
+            <label for="fileName">檔案名稱（選填）</label>
+            <input type="text" id="fileName" placeholder="例如：會議記錄、學習筆記">
+        </div>
+        
+        <div class="status" id="status">準備就緒</div>
+
+        <div class="recording-indicator" id="recordingIndicator">
+            <div class="rec-dot"></div>
+            <span class="rec-time" id="recordTime">00:00</span>
+        </div>
+        
+        <div class="controls">
+            <button id="recordBtn">
+                <span>🎤</span>
+                <span id="recordText">開始錄音</span>
+            </button>
+            <button id="stopBtn">
+                <span>⏹️</span>
+                停止錄音
+            </button>
+        </div>
+        
+        <div class="form-group">
+            <label>或選擇音訊檔案上傳</label>
+            <div class="file-input-wrapper">
+                <label for="audioFile" class="file-input-button" id="fileButton">
+                    <span class="file-icon" id="fileIcon">📁</span>
+                    <span class="file-text" id="fileText">點擊選擇音訊檔案</span>
+                    <span class="file-name" id="fileName2"></span>
+                </label>
+                <input type="file" id="audioFile" accept="audio/*">
+            </div>
+        </div>
+        
+        <button id="uploadBtn" disabled>
+            <span>📤</span>
+            上傳並轉錄
+        </button>
+        
+        <div class="loader" id="loader"></div>
+    </div>
+
+    <script>
+        // 請將此 URL 替換為您的 n8n webhook URL
+        const WEBHOOK_URL = 'https://your-n8n-instance.com/webhook/upload-notes';
+        
+        let mediaRecorder;
+        let audioChunks = [];
+        let recordingStartTime;
+        let recordingTimer;
+        let audioBlob = null;
+        
+        const recordBtn = document.getElementById('recordBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const uploadBtn = document.getElementById('uploadBtn');
+        const audioFileInput = document.getElementById('audioFile');
+        const userIdInput = document.getElementById('userId');
+        const fileNameInput = document.getElementById('fileName');
+        const status = document.getElementById('status');
+        const loader = document.getElementById('loader');
+        const recordText = document.getElementById('recordText');
+        const fileButton = document.getElementById('fileButton');
+        const fileIcon = document.getElementById('fileIcon');
+        const fileText = document.getElementById('fileText');
+        const fileName2 = document.getElementById('fileName2');
+        const recordingIndicator = document.getElementById('recordingIndicator');
+        const recordTime = document.getElementById('recordTime');
+        
+        // 開始錄音
+        recordBtn.addEventListener('click', async () => {
+            if (!userIdInput.value.trim()) {
+                showStatus('請先輸入使用者 ID', 'error');
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    uploadBtn.disabled = false;
+                    showStatus('錄音完成，可以上傳了！', 'success');
+                };
+                
+                mediaRecorder.start();
+                recordBtn.classList.add('recording');
+                recordText.textContent = '錄音中...';
+                stopBtn.style.display = 'flex';
+                recordBtn.style.display = 'none';
+                showStatus('🔴 正在錄音...', 'recording');
+                
+                // 開始計時
+                recordingIndicator.classList.add('active');
+                recordingStartTime = Date.now();
+                recordingTimer = setInterval(updateRecordingTime, 100);
+                
+            } catch (err) {
+                showStatus('無法存取麥克風: ' + err.message, 'error');
+            }
+        });
+        
+        // 更新錄音時間
+        function updateRecordingTime() {
+            const elapsed = Date.now() - recordingStartTime;
+            const seconds = Math.floor(elapsed / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            recordTime.textContent = `${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+        
+        // 停止錄音
+        stopBtn.addEventListener('click', () => {
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                recordBtn.classList.remove('recording');
+                recordText.textContent = '開始錄音';
+                stopBtn.style.display = 'none';
+                recordBtn.style.display = 'flex';
+                recordingIndicator.classList.remove('active');
+                clearInterval(recordingTimer);
+            }
+        });
+        
+        // 選擇檔案
+        audioFileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                audioBlob = file;
+                fileButton.classList.add('has-file');
+                fileIcon.textContent = '✅';
+                fileText.textContent = '已選擇檔案：';
+                fileName2.textContent = file.name;
+                uploadBtn.disabled = !userIdInput.value.trim();
+                showStatus('檔案已選擇，可以上傳了！', 'success');
+            }
+        });
+        
+        // 使用者 ID 輸入變更
+        userIdInput.addEventListener('input', () => {
+            uploadBtn.disabled = !userIdInput.value.trim() || !audioBlob;
+        });
+        
+        // 上傳按鈕
+        uploadBtn.addEventListener('click', async () => {
+            if (!audioBlob) {
+                showStatus('請先錄音或選擇檔案', 'error');
+                return;
+            }
+            
+            if (!userIdInput.value.trim()) {
+                showStatus('請輸入使用者 ID', 'error');
+                return;
+            }
+            
+            await uploadAudioFile();
+        });
+        
+        // 上傳音訊檔案到 n8n
+        async function uploadAudioFile() {
+            loader.style.display = 'block';
+            showStatus('處理中...', 'processing');
+            uploadBtn.disabled = true;
+            
+            try {
+                const formData = new FormData();
+                
+                // 添加音訊檔案
+                formData.append('audio_file', audioBlob, 'recording.wav');
+                
+                // 添加其他資料
+                formData.append('userId', userIdInput.value.trim());
+                formData.append('fileName', fileNameInput.value.trim() || '語音筆記');
+                
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('伺服器回應錯誤: ' + response.status);
+                }
+                
+                const result = await response.text();
+                showStatus('✅ ' + result, 'success');
+                
+                // 重置表單
+                setTimeout(() => {
+                    resetForm();
+                }, 2000);
+                
+            } catch (err) {
+                showStatus('❌ 錯誤: ' + err.message, 'error');
+                uploadBtn.disabled = false;
+            } finally {
+                loader.style.display = 'none';
+            }
+        }
+        
+        // 重置表單
+        function resetForm() {
+            audioBlob = null;
+            audioFileInput.value = '';
+            fileNameInput.value = '';
+            fileButton.classList.remove('has-file');
+            fileIcon.textContent = '📁';
+            fileText.textContent = '點擊選擇音訊檔案';
+            fileName2.textContent = '';
+            uploadBtn.disabled = true;
+            showStatus('準備就緒', '');
+        }
+        
+        // 顯示狀態
+        function showStatus(message, type) {
+            status.textContent = message;
+            status.className = 'status';
+            if (type) {
+                status.classList.add(type);
+            }
+        }
+    </script>
+</body>
+</html>
