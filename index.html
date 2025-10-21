@@ -480,6 +480,7 @@
                 }
                 
                 const result = await response.json();
+                console.log('123', result);
                 document.getElementById('result').innerText = result.text || '轉換失敗';
                 
                 // 重置表單
