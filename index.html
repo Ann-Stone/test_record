@@ -440,9 +440,9 @@
         }
 
         function displayTranslation(result) {
-            // 儲存到歷史記錄
+            // 儲存到歷史記錄 - original 是原文，translation 是翻譯結果
             translationHistory.push({
-                original: result.original || result.translation || '',
+                original: result.original || '',  // 儲存原文用於下次上下文
                 translation: result.translation || result.text || '翻譯中...'
             });
 
