@@ -480,7 +480,6 @@
             
             item.innerHTML = `
                 <div class="subtitle-time">${new Date().toLocaleTimeString()} - 第 ${segmentCount} 段</div>
-                <div class="subtitle-text">原文：${result.original || '讀取中...'}</div>
                 <div class="subtitle-text">翻譯：${result.translation || result.text || '翻譯中...'}</div>
                 ${originalHtml}
             `;
