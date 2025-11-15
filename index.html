@@ -49,6 +49,19 @@
             align-items: center;
             margin-bottom: 15px;
             gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        @media (max-width: 600px) {
+            .config-row {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+            }
+            
+            .config-row label {
+                min-width: auto;
+            }
         }
 
         .config-row:last-child {
@@ -455,12 +468,21 @@
                 translation: result.translation || result.text || '翻譯中...'
             });
 
-            // 顯示字幕
+            // 顯示字幕 - 同時顯示翻譯和原文
             const item = document.createElement('div');
             item.className = 'subtitle-item';
+            
+            let originalHtml = '';
+            // 如果原文和翻譯不同，才顯示原文
+            if (result.original && result.original !== result.translation) {
+                originalHtml = `<div class="subtitle-original">原文: ${result.original}</div>`;
+            }
+            
             item.innerHTML = `
                 <div class="subtitle-time">${new Date().toLocaleTimeString()} - 第 ${segmentCount} 段</div>
-                <div class="subtitle-text">${result.translation || result.text || '翻譯中...'}</div>
+                <div class="subtitle-text">原文：${result.original || '讀取中...'}</div>
+                <div class="subtitle-text">翻譯：${result.translation || result.text || '翻譯中...'}</div>
+                ${originalHtml}
             `;
             
             subtitles.appendChild(item);
