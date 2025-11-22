@@ -444,6 +444,7 @@
                     audioBlob: audioBlob,
                     segmentNumber: segmentCount,
                     timestamp: new Date().toISOString(),
+                    retryCount: 0,
                 };
                 requestQueue.push(queueItem);
 
@@ -477,19 +478,45 @@
                 isProcessingQueue = true;
                 const queueItem = requestQueue.shift();
 
-                await sendAudioToN8n(
+                let success = await sendAudioToN8n(
                     queueItem.audioBlob,
                     queueItem.segmentNumber,
                     queueItem.timestamp,
+                    queueItem.retryCount,
                 );
+
+                // 如果失敗且未超過重試次數，立即重試
+                if (!success && queueItem.retryCount < 1) {
+                    queueItem.retryCount++;
+                    console.log(
+                        `第 ${queueItem.segmentNumber} 段立即重試 (第 ${queueItem.retryCount} 次重試)`,
+                    );
+
+                    // 等待 1 秒後立即重試
+                    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+                    success = await sendAudioToN8n(
+                        queueItem.audioBlob,
+                        queueItem.segmentNumber,
+                        queueItem.timestamp,
+                        queueItem.retryCount,
+                    );
+                }
 
                 // 繼續處理下一個
                 processQueue();
             }
 
-            async function sendAudioToN8n(audioBlob, segmentNumber, timestamp) {
+            async function sendAudioToN8n(
+                audioBlob,
+                segmentNumber,
+                timestamp,
+                retryCount = 0,
+            ) {
+                const retryInfo =
+                    retryCount > 0 ? ` [重試 ${retryCount}/1]` : "";
                 updateStatus(
-                    `處理第 ${segmentNumber} 段音訊... (待處理: ${requestQueue.length} 段)`,
+                    `處理第 ${segmentNumber} 段音訊...${retryInfo} (待處理: ${requestQueue.length} 段)`,
                     "processing",
                 );
 
@@ -528,10 +555,13 @@
                                     "recording",
                                 );
                             }
+                            return true; // 成功
                         } else {
+                            const errorMsg = `第 ${segmentNumber} 段處理失敗: ${result.error || "未知錯誤"}`;
                             addErrorMessage(
-                                `第 ${segmentNumber} 段處理失敗: ${result.error || "未知錯誤"}`,
+                                errorMsg + (retryCount < 1 ? " - 將重試" : ""),
                             );
+                            return false; // 失敗
                         }
                     } else {
                         console.error(
@@ -543,8 +573,10 @@
                             .text()
                             .catch(() => "無法讀取錯誤訊息");
                         addErrorMessage(
-                            `第 ${segmentNumber} 段傳送失敗 (HTTP ${response.status})`,
+                            `第 ${segmentNumber} 段傳送失敗 (HTTP ${response.status})` +
+                                (retryCount < 1 ? " - 將重試" : ""),
                         );
+                        return false; // 失敗
                     }
                 } catch (err) {
                     console.error("發送錯誤:", err);
@@ -554,7 +586,10 @@
                     } else if (err.message.includes("Failed to fetch")) {
                         errorMsg += " - 網路錯誤或 URL 不正確";
                     }
-                    addErrorMessage(errorMsg);
+                    addErrorMessage(
+                        errorMsg + (retryCount < 1 ? " - 將重試" : ""),
+                    );
+                    return false; // 失敗
                 }
             }
 
