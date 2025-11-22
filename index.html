@@ -333,12 +333,6 @@
                 </div>
             </div>
 
-            <div class="warning">
-                <strong>⚠️ CORS 設定提醒：</strong>
-                如果出現 CORS 錯誤，請確保 n8n 工作流程中的 Webhook
-                節點已設定允許跨域請求。詳細設定方法請見下方說明。
-            </div>
-
             <div class="info">
                 <strong>💡 使用說明：</strong>
                 <ul>
@@ -361,6 +355,8 @@
             let segmentTimer;
             let translationHistory = [];
             let segmentCount = 0;
+            let requestQueue = [];
+            let isProcessingQueue = false;
 
             const recordBtn = document.getElementById("recordBtn");
             const stopBtn = document.getElementById("stopBtn");
@@ -388,6 +384,8 @@
                     // 清空之前的記錄
                     translationHistory = [];
                     segmentCount = 0;
+                    requestQueue = [];
+                    isProcessingQueue = false;
                     subtitles.innerHTML = "";
 
                     isRecording = true;
@@ -418,6 +416,9 @@
                     });
                     await sendAudioToN8n(audioBlob);
 
+                    // 加入佇列而不是直接發送
+                    addToQueue(audioBlob);
+
                     // 如果還在錄音狀態，繼續下一段
                     if (isRecording) {
                         setTimeout(() => startSegmentRecording(stream), 100);
@@ -438,8 +439,62 @@
             }
 
             async function sendAudioToN8n(audioBlob) {
+            // 加入佇列
+            function addToQueue(audioBlob) {
                 segmentCount++;
                 updateStatus(`處理第 ${segmentCount} 段音訊...`, "processing");
+                const queueItem = {
+                    audioBlob: audioBlob,
+                    segmentNumber: segmentCount,
+                    timestamp: new Date().toISOString(),
+                };
+                requestQueue.push(queueItem);
+
+                // 更新狀態顯示佇列數量
+                updateStatus(
+                    `錄音中... (待處理: ${requestQueue.length} 段)`,
+                    "recording",
+                );
+
+                // 如果沒有在處理佇列，開始處理
+                if (!isProcessingQueue) {
+                    processQueue();
+                }
+            }
+
+            // 處理佇列
+            async function processQueue() {
+                if (requestQueue.length === 0) {
+                    isProcessingQueue = false;
+                    if (isRecording) {
+                        updateStatus("錄音中...", "recording");
+                    } else {
+                        updateStatus(
+                            `處理完成 - 共處理 ${segmentCount} 段`,
+                            "idle",
+                        );
+                    }
+                    return;
+                }
+
+                isProcessingQueue = true;
+                const queueItem = requestQueue.shift();
+
+                await sendAudioToN8n(
+                    queueItem.audioBlob,
+                    queueItem.segmentNumber,
+                    queueItem.timestamp,
+                );
+
+                // 繼續處理下一個
+                processQueue();
+            }
+
+            async function sendAudioToN8n(audioBlob, segmentNumber, timestamp) {
+                updateStatus(
+                    `處理第 ${segmentNumber} 段音訊... (待處理: ${requestQueue.length} 段)`,
+                    "processing",
+                );
 
                 try {
                     // 準備上下文資料
@@ -463,6 +518,8 @@
                             context: contextData,
                             segmentNumber: segmentCount,
                             timestamp: new Date().toISOString(),
+                            segmentNumber: segmentNumber,
+                            timestamp: timestamp,
                         }),
                     });
 
@@ -471,6 +528,13 @@
                         if (result.success) {
                             displayTranslation(result);
                             updateStatus("錄音中...", "recording");
+                            displayTranslation(result, segmentNumber);
+                            if (isRecording) {
+                                updateStatus(
+                                    `錄音中... (待處理: ${requestQueue.length} 段)`,
+                                    "recording",
+                                );
+                            }
                         } else {
                             addErrorMessage(
                                 `第 ${segmentCount} 段處理失敗: ${result.error || "未知錯誤"}`,
@@ -478,6 +542,7 @@
                             updateStatus(
                                 "錄音中 (上一段處理失敗)",
                                 "recording",
+                                `第 ${segmentNumber} 段處理失敗: ${result.error || "未知錯誤"}`,
                             );
                         }
                     } else {
@@ -491,12 +556,14 @@
                             .catch(() => "無法讀取錯誤訊息");
                         addErrorMessage(
                             `第 ${segmentCount} 段傳送失敗 (HTTP ${response.status})`,
+                            `第 ${segmentNumber} 段傳送失敗 (HTTP ${response.status})`,
                         );
                         updateStatus("錄音中 (上一段傳送失敗)", "recording");
                     }
                 } catch (err) {
                     console.error("發送錯誤:", err);
                     let errorMsg = `第 ${segmentCount} 段處理錯誤`;
+                    let errorMsg = `第 ${segmentNumber} 段處理錯誤`;
                     if (err.message.includes("CORS")) {
                         errorMsg += " - CORS 錯誤，請檢查 n8n 設定";
                     } else if (err.message.includes("Failed to fetch")) {
@@ -520,6 +587,7 @@
             }
 
             function displayTranslation(result) {
+            function displayTranslation(result, segmentNumber) {
                 // 儲存到歷史記錄 - original 是原文，translation 是翻譯結果
                 translationHistory.push({
                     original: result.original || "", // 儲存原文用於下次上下文
@@ -539,6 +607,7 @@
 
                 item.innerHTML = `
                 <div class="subtitle-time">${new Date().toLocaleTimeString()} - 第 ${segmentCount} 段</div>
+                <div class="subtitle-time">${new Date().toLocaleTimeString()} - 第 ${segmentNumber} 段</div>
                 <div class="subtitle-text">翻譯：${result.translation || result.text || "翻譯中..."}</div>
                 ${originalHtml}
             `;
@@ -571,6 +640,19 @@
                 stopBtn.style.display = "none";
                 recordBtn.classList.remove("recording");
                 updateStatus(`錄音結束 - 共處理 ${segmentCount} 段`, "idle");
+
+                // 如果還有佇列在處理，顯示處理中狀態
+                if (requestQueue.length > 0 || isProcessingQueue) {
+                    updateStatus(
+                        `錄音結束 - 處理剩餘 ${requestQueue.length} 段...`,
+                        "processing",
+                    );
+                } else {
+                    updateStatus(
+                        `處理完成 - 共處理 ${segmentCount} 段`,
+                        "idle",
+                    );
+                }
             }
 
             function updateStatus(text, type) {
